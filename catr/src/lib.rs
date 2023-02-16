@@ -26,18 +26,17 @@ fn writer(reader: Box<dyn BufRead>, number: bool, number_nonblank: bool) -> MyRe
         read_line = line?;
         if number {
             count += 1;
-            // prefix = "     ".to_owned() + &count.to_string() + "  ";
+            println!("{:>6}\t{}", count, read_line)
         } else if number_nonblank {
             if read_line.is_empty() {
-                continue;
+                println!("{}", read_line)
+            } else {
+                count += 1;
+                println!("{:>6}\t{}", count, read_line)
             }
-            count += 1;
+        } else {
+            println!("{}", read_line)
         }
-    }
-    if number || number_nonblank {
-        println!("{:>6}\t{}", count, read_line)
-    } else {
-        println!("{}", read_line)
     }
     Ok(())
 }
