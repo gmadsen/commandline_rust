@@ -44,35 +44,20 @@ fn open(filename: &str) -> MyResult<Box<dyn BufRead>> {
     }
 }
 
-fn writer(reader: Box<dyn BufRead>, number: bool, number_nonblank: bool) -> MyResult<()> {
-    let mut count: i32 = 0;
-    let mut read_line = String::new();
-    for line in reader.lines() {
-        read_line = line?;
-        if number {
-            count += 1;
-            println!("{:>6}\t{}", count, read_line)
-        } else if number_nonblank {
-            if read_line.is_empty() {
-                println!("{}", read_line)
-            } else {
-                count += 1;
-                println!("{:>6}\t{}", count, read_line)
-            }
-        } else {
-            println!("{}", read_line)
-        }
-    }
-    Ok(())
-}
-
 pub fn run(config: Config) -> MyResult<()> {
-    println!("{:?}", config);
+    // println!("{:?}", config);
     for filename in config.files {
         match open(&filename) {
             Err(err) => eprintln!("Failed to open {}: {}", filename, err),
             Ok(reader) => {
-                println!("we good homie")
+                let mut count = 0;
+                for line in reader.lines() {
+                    if count >= config.lines {
+                        break;
+                    }
+                    println!("{}", line.unwrap());
+                    count += 1;
+                }
             }
         }
     }
@@ -98,7 +83,8 @@ pub fn get_args() -> MyResult<Config> {
                 .long("line_count")
                 .help("number of lines from head")
                 .takes_value(true)
-                .conflicts_with("number_nonblank"),
+                .default_value("10")
+                .conflicts_with("byte_count"),
         )
         .arg(
             Arg::with_name("byte_count")
@@ -109,9 +95,14 @@ pub fn get_args() -> MyResult<Config> {
         )
         .get_matches();
 
+    let byte_me = match matches.value_of("byte_count") {
+        Some(pooky) => Some(parse_positive_int(pooky).unwrap()),
+        None => None,
+    };
+
     Ok(Config {
         files: matches.values_of_lossy("files").unwrap(),
-        lines: 22,       //matches.value_of("number").unwrap(),
-        bytes: Some(22), //matches.("number_nonblank").unwrap(),
+        lines: parse_positive_int(matches.value_of("line_count").unwrap()).unwrap(),
+        bytes: byte_me,
     })
 }
