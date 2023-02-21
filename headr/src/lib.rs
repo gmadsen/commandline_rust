@@ -49,14 +49,40 @@ pub fn run(config: Config) -> MyResult<()> {
     for filename in config.files {
         match open(&filename) {
             Err(err) => eprintln!("Failed to open {}: {}", filename, err),
-            Ok(reader) => {
-                let mut count = 0;
-                for line in reader.lines() {
-                    if count >= config.lines {
-                        break;
+            Ok(mut reader) => {
+                if config.bytes.is_some() {
+                    let mut bytes = 0;
+                    let mut buf = [0; 1];
+                    while bytes < config.bytes.unwrap() {
+                        match reader.read(&mut buf) {
+                            Ok(0) => break,
+                            Ok(_) => {
+                                bytes += 1;
+                                print!("{}", buf[0] as char);
+                            }
+                            Err(err) => {
+                                eprintln!("Failed to read from {}: {}", filename, err);
+                                break;
+                            }
+                        }
                     }
-                    println!("{}", line.unwrap());
-                    count += 1;
+                } else {
+                    let mut line = String::new();
+                    for _n in 0..config.lines {
+                        match reader.read_line(&mut line) {
+                            Ok(0) => {
+                                break;
+                            }
+                            Ok(_) => {
+                                print!("{}", line);
+                                line.clear();
+                            }
+                            Err(err) => {
+                                eprintln!("Failed to read from {}: {}", filename, err);
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -74,8 +100,7 @@ pub fn get_args() -> MyResult<Config> {
                 .value_name("FILES")
                 .help("Input file names")
                 .multiple(true)
-                .default_value("-")
-                .min_values(1),
+                .default_value("-"),
         )
         .arg(
             Arg::with_name("line_count")
@@ -83,26 +108,33 @@ pub fn get_args() -> MyResult<Config> {
                 .long("line_count")
                 .help("number of lines from head")
                 .takes_value(true)
-                .default_value("10")
-                .conflicts_with("byte_count"),
+                .default_value("10"),
         )
         .arg(
             Arg::with_name("byte_count")
                 .short("c")
                 .long("byte_count")
                 .help("number of bytes from head")
-                .takes_value(true),
+                .takes_value(true)
+                .conflicts_with("line_count"),
         )
         .get_matches();
 
-    let byte_me = match matches.value_of("byte_count") {
-        Some(pooky) => Some(parse_positive_int(pooky).unwrap()),
-        None => None,
-    };
+    let lines = matches
+        .value_of("line_count")
+        .map(parse_positive_int)
+        .transpose()
+        .map_err(|e| format!("illegal line count -- {}", e))?;
+
+    let bytes = matches
+        .value_of("bytes")
+        .map(parse_positive_int)
+        .transpose()
+        .map_err(|e| format!("illegal byte count -- {}", e))?;
 
     Ok(Config {
         files: matches.values_of_lossy("files").unwrap(),
-        lines: parse_positive_int(matches.value_of("line_count").unwrap()).unwrap(),
-        bytes: byte_me,
+        lines: lines.unwrap(),
+        bytes,
     })
 }
