@@ -75,21 +75,28 @@ pub fn get_args() -> MyResult<Config> {
                 .short("c")
                 .long("bytes")
                 .help("count number of bytes")
-                .takes_value(false),
+                .takes_value(false)
+                .conflicts_with("chars"),
         )
         .get_matches();
 
-    let _bytes = matches.is_present("bytes");
-    //     .value_of("byte_count")
-    //     .map(parse_positive_int)
-    //     .transpose()
-    //     .map_err(|e| format!("illegal byte count -- {}", e))?;
+    let mut bytes = matches.is_present("bytes");
+    let mut words = matches.is_present("words");
+    let mut lines = matches.is_present("lines");
+    let chars = matches.is_present("chars");
+    let flag_usage = bytes || chars || words || lines;
+
+    if !flag_usage {
+        lines = true;
+        words = true;
+        bytes = true;
+    }
 
     Ok(Config {
         files: matches.values_of_lossy("files").unwrap(),
-        lines: true,
-        words: true,
-        bytes: true,
-        chars: true,
+        lines,
+        words,
+        bytes,
+        chars,
     })
 }
