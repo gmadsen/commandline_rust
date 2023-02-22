@@ -46,26 +46,22 @@ fn open(filename: &str) -> MyResult<Box<dyn BufRead>> {
 
 pub fn run(config: Config) -> MyResult<()> {
     // println!("{:?}", config);
-    for filename in config.files {
+    let num_files = config.files.len();
+    for (file_num, filename) in config.files.iter().enumerate() {
         match open(&filename) {
             Err(err) => eprintln!("Failed to open {}: {}", filename, err),
             Ok(mut reader) => {
-                if config.bytes.is_some() {
-                    let mut bytes = 0;
-                    let mut buf = [0; 1];
-                    while bytes < config.bytes.unwrap() {
-                        match reader.read(&mut buf) {
-                            Ok(0) => break,
-                            Ok(_) => {
-                                bytes += 1;
-                                print!("{}", buf[0] as char);
-                            }
-                            Err(err) => {
-                                eprintln!("Failed to read from {}: {}", filename, err);
-                                break;
-                            }
-                        }
-                    }
+                if num_files > 1 {
+                    println!(
+                        "{}==> {} <==",
+                        if file_num > 0 { "\n" } else { "" },
+                        filename
+                    );
+                }
+                if let Some(bytes) = config.bytes {
+                    let mut buffer = [0; 4];
+                    let n = reader.read(&mut buffer[..bytes])?;
+                    print!("{}", String::from_utf8_lossy(&buffer[..n]));
                 } else {
                     let mut line = String::new();
                     for _n in 0..config.lines {
@@ -104,16 +100,18 @@ pub fn get_args() -> MyResult<Config> {
         )
         .arg(
             Arg::with_name("line_count")
+                .value_name("LINES")
                 .short("n")
-                .long("line_count")
+                .long("lines")
                 .help("number of lines from head")
                 .takes_value(true)
                 .default_value("10"),
         )
         .arg(
             Arg::with_name("byte_count")
+                .value_name("BYTES")
                 .short("c")
-                .long("byte_count")
+                .long("bytes")
                 .help("number of bytes from head")
                 .takes_value(true)
                 .conflicts_with("line_count"),
@@ -127,7 +125,7 @@ pub fn get_args() -> MyResult<Config> {
         .map_err(|e| format!("illegal line count -- {}", e))?;
 
     let bytes = matches
-        .value_of("bytes")
+        .value_of("byte_count")
         .map(parse_positive_int)
         .transpose()
         .map_err(|e| format!("illegal byte count -- {}", e))?;
